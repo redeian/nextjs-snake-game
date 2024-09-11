@@ -1,101 +1,187 @@
-import Image from "next/image";
+"use client";
+import React, { useState, useEffect, useCallback } from "react";
 
-export default function Home() {
+const GRID_SIZE = 20;
+const CELL_SIZE = 20;
+const INITIAL_SNAKE = [{ x: 10, y: 10 }];
+const INITIAL_DIRECTION = { x: 1, y: 0 };
+const INITIAL_FOOD = { x: 15, y: 15 };
+
+const Particle = ({ x, y, color, lifespan }) => {
+  const [opacity, setOpacity] = useState(1);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setOpacity(0), lifespan);
+    return () => clearTimeout(timer);
+  }, [lifespan]);
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div
+      style={{
+        position: "absolute",
+        left: x,
+        top: y,
+        width: 4,
+        height: 4,
+        backgroundColor: color,
+        borderRadius: "50%",
+        opacity,
+        transition: `opacity ${lifespan}ms linear`,
+      }}
+    />
+  );
+};
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+export default function SnakeGame() {
+  const [snake, setSnake] = useState(INITIAL_SNAKE);
+  const [direction, setDirection] = useState(INITIAL_DIRECTION);
+  const [food, setFood] = useState(INITIAL_FOOD);
+  const [gameOver, setGameOver] = useState(false);
+  const [score, setScore] = useState(0);
+  const [highScore, setHighScore] = useState(0);
+  const [particles, setParticles] = useState([]);
+
+  const createParticles = (x, y) => {
+    const newParticles = Array.from({ length: 20 }, (_, i) => ({
+      id: Date.now() + i,
+      x: x * CELL_SIZE + Math.random() * CELL_SIZE,
+      y: y * CELL_SIZE + Math.random() * CELL_SIZE,
+      color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+      lifespan: 300 + Math.random() * 700,
+    }));
+    setParticles((prevParticles) => [...prevParticles, ...newParticles]);
+  };
+
+  const moveSnake = useCallback(() => {
+    if (gameOver) return;
+
+    setSnake((prevSnake) => {
+      const newHead = {
+        x: (prevSnake[0].x + direction.x + GRID_SIZE) % GRID_SIZE,
+        y: (prevSnake[0].y + direction.y + GRID_SIZE) % GRID_SIZE,
+      };
+
+      if (isCollision(newHead, prevSnake.slice(1))) {
+        setGameOver(true);
+        return prevSnake;
+      }
+
+      const newSnake = [newHead, ...prevSnake];
+
+      if (newHead.x === food.x && newHead.y === food.y) {
+        setFood(getRandomFood());
+        createParticles(food.x, food.y);
+        setScore((prevScore) => {
+          const newScore = prevScore + 1;
+          if (newScore > highScore) {
+            setHighScore(newScore);
+          }
+          return newScore;
+        });
+      } else {
+        newSnake.pop();
+      }
+
+      return newSnake;
+    });
+  }, [direction, food, gameOver, highScore]);
+
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      switch (e.key) {
+        case "ArrowUp":
+          setDirection((prev) => (prev.y === 1 ? prev : { x: 0, y: -1 }));
+          break;
+        case "ArrowDown":
+          setDirection((prev) => (prev.y === -1 ? prev : { x: 0, y: 1 }));
+          break;
+        case "ArrowLeft":
+          setDirection((prev) => (prev.x === 1 ? prev : { x: -1, y: 0 }));
+          break;
+        case "ArrowRight":
+          setDirection((prev) => (prev.x === -1 ? prev : { x: 1, y: 0 }));
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+
+    const gameInterval = setInterval(moveSnake, 100);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyPress);
+      clearInterval(gameInterval);
+    };
+  }, [moveSnake]);
+
+  const isCollision = (head, body) => {
+    return body.some((segment) => segment.x === head.x && segment.y === head.y);
+  };
+
+  const getRandomFood = () => {
+    let newFood;
+    do {
+      newFood = {
+        x: Math.floor(Math.random() * GRID_SIZE),
+        y: Math.floor(Math.random() * GRID_SIZE),
+      };
+    } while (isCollision(newFood, snake));
+    return newFood;
+  };
+
+  const resetGame = () => {
+    setSnake(INITIAL_SNAKE);
+    setDirection(INITIAL_DIRECTION);
+    setFood(INITIAL_FOOD);
+    setGameOver(false);
+    setScore(0);
+    setParticles([]);
+  };
+
+  return (
+    <div style={{ textAlign: "center" }}>
+      <h1>Snake Game</h1>
+      <div>
+        Score: {score} | High Score: {highScore}
+      </div>
+      <div
+        style={{
+          display: "inline-block",
+          backgroundColor: "#eee",
+          border: "1px solid #999",
+          position: "relative",
+        }}
+      >
+        {Array.from({ length: GRID_SIZE }).map((_, row) => (
+          <div key={row} style={{ display: "flex" }}>
+            {Array.from({ length: GRID_SIZE }).map((_, col) => (
+              <div
+                key={`${row}-${col}`}
+                style={{
+                  width: CELL_SIZE,
+                  height: CELL_SIZE,
+                  backgroundColor: snake.some(
+                    (segment) => segment.x === col && segment.y === row
+                  )
+                    ? "green"
+                    : food.x === col && food.y === row
+                    ? "red"
+                    : "transparent",
+                }}
+              />
+            ))}
+          </div>
+        ))}
+        {particles.map((particle) => (
+          <Particle key={particle.id} {...particle} />
+        ))}
+      </div>
+      {gameOver && (
+        <div>
+          <h2>Game Over!</h2>
+          <button onClick={resetGame}>Restart</button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      )}
     </div>
   );
 }
