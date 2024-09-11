@@ -7,7 +7,27 @@ const INITIAL_SNAKE = [{ x: 10, y: 10 }];
 const INITIAL_DIRECTION = { x: 1, y: 0 };
 const INITIAL_FOOD = { x: 15, y: 15 };
 
-const Particle = ({ x, y, color, lifespan }) => {
+interface ParticleProps {
+  x: number;
+  y: number;
+  color: string;
+  lifespan: number;
+}
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface Particle {
+  id: number;
+  x: number;
+  y: number;
+  color: string;
+  lifespan: number;
+}
+
+const Particle = ({ x, y, color, lifespan }: ParticleProps) => {
   const [opacity, setOpacity] = useState(1);
 
   useEffect(() => {
@@ -39,9 +59,9 @@ export default function SnakeGame() {
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
-  const [particles, setParticles] = useState([]);
+  const [particles, setParticles] = useState<Particle[]>([]);
 
-  const createParticles = (x, y) => {
+  const createParticles = (x: number, y: number) => {
     const newParticles = Array.from({ length: 20 }, (_, i) => ({
       id: Date.now() + i,
       x: x * CELL_SIZE + Math.random() * CELL_SIZE,
@@ -87,7 +107,7 @@ export default function SnakeGame() {
   }, [direction, food, gameOver, highScore]);
 
   useEffect(() => {
-    const handleKeyPress = (e) => {
+    const handleKeyPress = (e: KeyboardEvent) => {
       switch (e.key) {
         case "ArrowUp":
           setDirection((prev) => (prev.y === 1 ? prev : { x: 0, y: -1 }));
@@ -114,7 +134,7 @@ export default function SnakeGame() {
     };
   }, [moveSnake]);
 
-  const isCollision = (head, body) => {
+  const isCollision = (head: Point, body: Point[]) => {
     return body.some((segment) => segment.x === head.x && segment.y === head.y);
   };
 
